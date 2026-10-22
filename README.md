@@ -2,25 +2,25 @@
 
 A 2D ragdoll that learns to stand up and keep its balance, even when you shove it around with the mouse.
 
-- **Simulation** (`rl_standup.cpp` and the `*.h` files): a hand-written C++ physics engine with OpenGL rendering. The ragdoll has 11 bones and 10 motorised joints.
-- **Agent** (`train.py`, `test.py`): a PPO agent written in PyTorch.
+- **Simulation** (`sim/`): a hand-written C++ physics engine with OpenGL rendering. The ragdoll has 11 bones and 10 motorised joints.
+- **Agent** (`agent/`): a PPO agent written in PyTorch.
 - The two talk over UDP on localhost, in lockstep. Python sends 10 target joint angles per body, the sim advances one 1/60 s step and replies with the new state.
 
 Windows only for now (Winsock, MinGW build).
 
 ## Requirements
 
-- Windows with a MinGW-w64 `g++` (for example [WinLibs](https://winlibs.com/))
+- Windows with a MinGW-w64 `g++` on your `PATH` (for example [WinLibs](https://winlibs.com/))
 - Python 3.10+ and PyTorch (`pip install -r requirements.txt`)
-- GLFW 3 is vendored in `GLFW/`
+- GLFW 3 is vendored in `third_party/GLFW`
 
 ## Build the simulation
 
 ```powershell
-g++ -O2 -std=c++17 rl_standup.cpp -o rl_standup.exe -I GLFW/include GLFW/lib/libglfw3.a -lopengl32 -lgdi32 -lws2_32
+.\build.ps1
 ```
 
-Keep `-O2`; without it the sim is far too slow for training.
+This produces `rl_standup.exe`. The script builds with `-O2`; without it the sim is far too slow for training.
 
 ## Train
 
@@ -60,12 +60,31 @@ In the window: move the mouse to push the ragdoll with the orange ball, left-cli
 
 The ports default to 5005 (simulation) and 5006 (Python). Set `STANDUP_SIM_PORT` and `STANDUP_PY_PORT` before starting both sides to run a second instance alongside. `STANDUP_KP` and `STANDUP_KD` override the joint motor gains for experiments.
 
-## Layout
+## Project layout
 
-| File | Purpose |
-| --- | --- |
-| `rl_standup.cpp` | main loop, UDP handling, mouse input, automatic disturbances, rendering |
-| `Skeleton.h`, `Bone.h`, `Joint.h` | ragdoll physics, motors and constraints |
-| `Network.h`, `Engine.h`, `Vec2.h` | UDP sockets, GLFW window, vector maths |
-| `train.py` | policy and critic networks, reward, PPO training, UDP client |
-| `test.py` | evaluation and stress testing |
+```
+train.py, test.py        entry points (thin wrappers around agent/)
+build.ps1                builds rl_standup.exe
+agent/                   Python: the learning side
+  config.py                constants shared with the sim (ports, dimensions, joint limits, file names)
+  networks.py              observation scaling, policy (actor) and critic
+  client.py                UDP client for the simulation
+  reward.py                reward function
+  ppo.py                   GAE and the clipped PPO update
+  checkpoint.py            atomic saving and resuming
+  train_loop.py            rollouts, logging, curriculum (python train.py)
+  evaluate.py              evaluation and stress testing (python test.py)
+sim/                     C++: the simulation side
+  main.cpp                 main loop
+  World.h                  shared state and constants
+  Protocol.h               UDP handshakes, step packets, state packing, fall detection
+  Simulation.h             lockstep and freeplay physics stepping
+  Disturbances.h           random shoves and flying balls used in training / stress tests
+  CursorBall.h             ball-vs-ragdoll collision
+  Input.h                  mouse and keyboard callbacks
+  Render.h                 OpenGL drawing
+  physics/                 Vec2, Bone, Joint (motor + constraint), Skeleton (ragdoll)
+  platform/                Engine (GLFW window), Network (Winsock UDP)
+third_party/GLFW/        vendored GLFW 3 headers and library
+docs/                    design sketch of the skeleton
+```
