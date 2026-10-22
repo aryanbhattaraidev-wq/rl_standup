@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Build output
+*.exe
+*.o
+
+# Training output (checkpoints, logs)
+*.pth
+*.tmp
+training_log.csv
+
+# Editor / machine-specific
+.vscode/
